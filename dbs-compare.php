@@ -44,6 +44,7 @@ $files = [
     'events' => "$output_dir/dbs-compare-events.csv",
     'foreign_keys' => "$output_dir/dbs-compare-foreign-keys.csv",
     'indexes' => "$output_dir/dbs-compare-indexes.csv",
+    'configs' => "$output_dir/dbs-compare-configs.csv",
 ];
 
 // Remover arquivos antigos
@@ -101,7 +102,7 @@ function compareTables($conn1, $conn2, $db1_name, $db2_name, $count_records) {
 
     $all_tables = array_unique(array_merge($tables_db1, $tables_db2));
 
-    if ($table_limit_debug) $all_tables = array_slice($all_tables,0,$table_limit_debug);
+    if ($table_limit_debug) $all_tables = array_slice($all_tables, 0, $table_limit_debug);
 
     foreach ($all_tables as $table) {
         $exists1 = in_array($table, $tables_db1);
@@ -123,7 +124,7 @@ function compareTables($conn1, $conn2, $db1_name, $db2_name, $count_records) {
                 $count2 = $count_result ? $count_result->fetch_assoc()['total'] : "ERRO";
             }
 
-            $diff = $count1 - $count2;
+            $diff = is_numeric($count1) && is_numeric($count2) ? $count1 - $count2 : "N/D";
         }
 
         fputcsv($handle, [$table, $exists1 ? "EXISTE" : "NAO_EXISTE", $exists2 ? "EXISTE" : "NAO_EXISTE", $count1, $count2, $diff], "\t");
@@ -169,6 +170,40 @@ function compareObjects($conn1, $conn2, $db1_name, $db2_name, $object_type, $sql
     fclose($handle);
 }
 
+// Função para comparar configurações
+function compareConfigurations($conn1, $conn2) {
+    global $files;
+
+    $header = ["Configuração", "Valor Banco 1", "Valor Banco 2", "Status"];
+    $handle = fopen($files['configs'], 'w');
+    fputcsv($handle, $header, "\t");
+
+    $sql = "SHOW VARIABLES";
+    $result1 = $conn1->query($sql);
+    $result2 = $conn2->query($sql);
+
+    $configs_db1 = [];
+    $configs_db2 = [];
+
+    while ($row = $result1->fetch_assoc()) {
+        $configs_db1[$row['Variable_name']] = $row['Value'];
+    }
+    while ($row = $result2->fetch_assoc()) {
+        $configs_db2[$row['Variable_name']] = $row['Value'];
+    }
+
+    $all_configs = array_unique(array_merge(array_keys($configs_db1), array_keys($configs_db2)));
+
+    foreach ($all_configs as $config) {
+        $value1 = $configs_db1[$config] ?? "N/A";
+        $value2 = $configs_db2[$config] ?? "N/A";
+        $status = $value1 === $value2 ? "IGUAL" : "DIFERENTE";
+        fputcsv($handle, [$config, $value1, $value2, $status], "\t");
+    }
+
+    fclose($handle);
+}
+
 // Reconectar aos bancos
 $conn1 = reconnect($db1_host, $db1_user, $db1_pass, $db1_name);
 $conn2 = reconnect($db2_host, $db2_user, $db2_pass, $db2_name);
@@ -192,6 +227,10 @@ foreach ($object_queries as $key => $query) {
     log_message("Comparando $key...");
     compareObjects($conn1, $conn2, $db1_name, $db2_name, ucfirst($key), $query, $key);
 }
+
+// Comparar configurações
+log_message("Comparando configurações...");
+compareConfigurations($conn1, $conn2);
 
 // Fechar conexões
 $conn1->close();
