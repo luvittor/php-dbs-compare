@@ -1,5 +1,4 @@
 vendor
 .env
-dbs-compare.csv
-dbs-compare.log
 notes.md
+output
