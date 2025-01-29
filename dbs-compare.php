@@ -79,7 +79,7 @@ function compareTables($conn1, $conn2, $db1_name, $db2_name, $count_records) {
     $handle = fopen($files['tables'], 'w');
     fputcsv($handle, $header, "\t");
 
-    $sql = "SELECT table_name FROM information_schema.tables WHERE table_schema = ?";
+    $sql = "SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_type = 'BASE TABLE'";
     $stmt1 = $conn1->prepare($sql);
     $stmt1->bind_param('s', $db1_name);
     $stmt1->execute();
@@ -111,6 +111,8 @@ function compareTables($conn1, $conn2, $db1_name, $db2_name, $count_records) {
         $count1 = "N/D";
         $count2 = "N/D";
         $diff = "N/D";
+
+        // view
 
         if ($count_records) {
             if ($exists1) {
